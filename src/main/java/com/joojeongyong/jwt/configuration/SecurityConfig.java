@@ -1,9 +1,12 @@
 package com.joojeongyong.jwt.configuration;
 
+import com.joojeongyong.jwt.filter.JwtAuthenticationFilter;
 import com.joojeongyong.jwt.filter.MyFilter1;
 import com.joojeongyong.jwt.filter.MySecurityFilter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.builders.WebSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -29,13 +32,14 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .csrf().disable()
                 .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 .and()
+                .addFilter(new JwtAuthenticationFilter(authenticationManager()))
                 .addFilter(corsFilter)
                 .formLogin().disable()
                 .httpBasic().disable()
                 .authorizeRequests()
-                    .antMatchers("/api/v1/user/**").hasRole("{USER,MANAGER,ADMIN}")
-                    .antMatchers("/api/v1/manager/**").hasRole("{MANAGER,ADMIN}")
-                    .antMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                .antMatchers("/api/v1/user/**").hasRole("{USER,MANAGER,ADMIN}")
+                .antMatchers("/api/v1/manager/**").hasRole("{MANAGER,ADMIN}")
+                .antMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 .anyRequest().permitAll();
     }
 }
