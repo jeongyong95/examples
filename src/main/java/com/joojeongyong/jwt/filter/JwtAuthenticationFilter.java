@@ -1,26 +1,24 @@
 package com.joojeongyong.jwt.filter;
 
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.algorithms.Algorithm;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.joojeongyong.jwt.auth.PrincipalDetails;
 import com.joojeongyong.jwt.model.User;
-import com.joojeongyong.jwt.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-
-import javax.annotation.Resource;
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.BufferedReader;
 import java.io.IOException;
+import java.util.Date;
 
 // /login 요청해서 id, pw 전송하면 UsernamePasswordAuthenticationFilter가 동작함 --> formLogin 때만
 // 따라서 이거 만들어서 넣어줘야 한다.
@@ -29,22 +27,12 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilter {
 
     private final AuthenticationManager authenticationManager;
-    @Resource
-    private PasswordEncoder passwordEncoder;
-    @Resource
-    private UserRepository userRepository;
 
     //    로그인 요청에서 로그인 시도를 위해 실행되는 메서드
     @Override
     public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response) throws AuthenticationException {
         log.info("JwtAuthenticationFilter 로그인 시도 메서드 작동");
         User user = new User();
-        user.setUsername("jeongyong95");
-        user.setPassword(passwordEncoder.encode("1234"));
-        user.setId(1l);
-        user.setRoles("USER");
-        userRepository.save(user);
-
 //        1. id. pw 받음
         ObjectMapper mapper = new ObjectMapper();
         user = null;
@@ -75,6 +63,14 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
     protected void successfulAuthentication(HttpServletRequest request, HttpServletResponse response, FilterChain chain, Authentication authResult) throws IOException, ServletException {
 //        인증이 통과되면 여기로 로그인 처리가 여기로 이어짐
 //        attempt 메서드 직후 현재 메서드가 실행됨
-        super.successfulAuthentication(request, response, chain, authResult);
+        PrincipalDetails principalDetails = (PrincipalDetails) authResult.getPrincipal();
+
+        String jwtToken = JWT.create()
+                .withSubject("studyMaker") // 큰 의미 없다
+                .withExpiresAt(new Date(System.currentTimeMillis() + 1000 * 60 * 15)) // accessToken 만료시간
+                .withClaim("id", principalDetails.getUser().getId())
+                .withClaim("username", principalDetails.getUser().getUsername()) //넣고 싶은 값을 클레임에 넣음
+                .sign(Algorithm.HMAC512("studyMaker")); // 서버만 알고 있는 비밀키 HMAC방식
+        response.addHeader("Authorization", "bearer " + jwtToken);
     }
 }
