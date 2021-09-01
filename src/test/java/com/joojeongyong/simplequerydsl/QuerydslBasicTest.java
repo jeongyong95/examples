@@ -14,7 +14,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.persistence.EntityManager;
+import javax.persistence.EntityManagerFactory;
 import javax.persistence.PersistenceContext;
+import javax.persistence.PersistenceUnit;
 import java.util.List;
 
 @Transactional
@@ -200,5 +202,85 @@ public class QuerydslBasicTest {
         Assertions.assertThat(teamA.get(QMember.member.age.avg())).isEqualTo(15);
         Assertions.assertThat(teamB.get(QTeam.team.name)).isEqualTo("teamB");
         Assertions.assertThat(teamB.get(QMember.member.age.avg())).isEqualTo(35);
+    }
+
+    // 조인 - 기본
+    @Test
+    public void join() {
+        QMember member = QMember.member;
+        QTeam team = QTeam.team;
+
+        List<Member> result = queryFactory.selectFrom(member)
+                .join(member.team, team)
+                .where(team.name.eq("teamA"))
+                .fetch();
+
+        Assertions.assertThat(result).extracting("username")
+                .contains("member1", "member2");
+    }
+
+
+    // 세타 조인 - 아무런 연관관계가 없는 테이블 간 조인
+    @Test
+    public void thetaJoin() {
+        manager.persist(new Member("teamA"));
+
+        List<Member> result = queryFactory.select(QMember.member)
+                .from(QMember.member, QTeam.team)
+                .where(QMember.member.username.eq(QTeam.team.name))
+                .fetch();
+
+        Assertions.assertThat(result).extracting("username")
+                .contains("teamA");
+    }
+
+    // 조인의 on절 - 조인 대상의 필터링
+    @Test
+    public void joinOnIsFiltering() {
+        List<Tuple> result = queryFactory.select(QMember.member, QTeam.team)
+                .from(QMember.member)
+                // left outer join
+                // member를 기준으로 member.team이 teamA이면 조인하고,
+                // 아니면 team을 조인하지 않는다
+                .leftJoin(QMember.member.team, QTeam.team)
+                .on(QTeam.team.name.eq("teamA"))
+                .fetch();
+
+        result.forEach(System.out::println);
+    }
+
+    @PersistenceUnit
+    EntityManagerFactory factory;
+
+    @Test
+    public void notUsingFetchJoin() {
+        manager.flush();
+        manager.clear();
+
+        // 페치 조인 X
+        Member member = queryFactory.selectFrom(QMember.member)
+                .where(QMember.member.username.eq("member1"))
+                .fetchOne();
+        boolean isLoaded = factory.getPersistenceUnitUtil().isLoaded(member.getTeam());
+        Assertions.assertThat(isLoaded).as("페치 조인이 적용되지 않음").isFalse();
+    }
+
+    // 페치조인 - 최적화를 위해 JPA가 제공한다.
+    @Test
+    public void fetchJoin() {
+        manager.flush();
+        manager.clear();
+
+        Member member = queryFactory.selectFrom(QMember.member)
+                .innerJoin(QMember.member.team, QTeam.team)
+                // join 메서드들 뒤에 배치하는 게 명확함
+                .fetchJoin()
+                // 검색 대상이 아닌 조인 대상에 대해서 on 절로 필터링을 하면 fetchJoin()을 수행할 수 없다 --> exception
+                .where(QMember.member.username.eq("member1"))
+                .fetchOne();
+
+
+        boolean isLoaded = factory.getPersistenceUnitUtil().isLoaded(member.getTeam());
+        Assertions.assertThat(isLoaded).as("페치 조인이 적용됨").isTrue();
     }
 }
