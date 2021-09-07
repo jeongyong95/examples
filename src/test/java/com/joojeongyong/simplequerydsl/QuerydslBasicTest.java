@@ -1,11 +1,15 @@
 package com.joojeongyong.simplequerydsl;
 
+import com.joojeongyong.simplequerydsl.dto.MemberDto;
+import com.joojeongyong.simplequerydsl.dto.QMemberDto;
+import com.joojeongyong.simplequerydsl.dto.UserDto;
 import com.joojeongyong.simplequerydsl.entity.Member;
 import com.joojeongyong.simplequerydsl.entity.QMember;
 import com.joojeongyong.simplequerydsl.entity.QTeam;
 import com.joojeongyong.simplequerydsl.entity.Team;
 import com.querydsl.core.QueryResults;
 import com.querydsl.core.Tuple;
+import com.querydsl.core.types.Projections;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.assertj.core.api.Assertions;
@@ -347,5 +351,95 @@ public class QuerydslBasicTest {
                             .from(memberSub))
             );
         });
+    }
+
+    // 순수 JPA에서 DTO로 조회 결과 받기
+    @Test
+    public void jpqlWithDto() {
+        List<MemberDto> result = manager.createQuery("select new com.joojeongyong.simplequerydsl.dto.MemberDto(m.username, m.age) " +
+                        "from Member m", MemberDto.class)
+                .getResultList();
+        result.forEach(System.out::println);
+        Assertions.assertThat(result).isNotNull();
+    }
+
+    // Dto projection
+
+    // 프로퍼티 접근
+    @Test
+    public void setterProjection() {
+        List<MemberDto> result = queryFactory.select(
+                        Projections.bean(
+                                MemberDto.class,
+                                QMember.member.username,
+                                QMember.member.age
+                        )
+                )
+                .from(QMember.member)
+                .fetch();
+        result.forEach(System.out::println);
+        Assertions.assertThat(result).isNotNull();
+    }
+
+    // 필드 직접 접근
+    @Test
+    public void fieldProjection() {
+        List<MemberDto> result = queryFactory.select(
+                        Projections.fields(
+                                MemberDto.class,
+                                QMember.member.username,
+                                QMember.member.age
+                        )
+                )
+                .from(QMember.member)
+                .fetch();
+        result.forEach(System.out::println);
+        Assertions.assertThat(result).isNotNull();
+    }
+
+    // 별칭으로 받기
+    @Test
+    public void fieldWithAliasProjection() {
+        List<UserDto> result = queryFactory.select(
+                        Projections.fields(
+                                UserDto.class,
+                                QMember.member.username.as("name"),
+                                QMember.member.age
+                        )
+                )
+                .from(QMember.member)
+                .fetch();
+        result.forEach(System.out::println);
+        Assertions.assertThat(result).isNotNull();
+    }
+
+    // 생성자 접근
+    @Test
+    public void constructorProjection() {
+        List<MemberDto> result = queryFactory
+                .select(Projections.constructor(
+                        MemberDto.class,
+                        QMember.member.username,
+                        QMember.member.username,
+                        QMember.member.age
+                ))
+                .from(QMember.member)
+                .fetch();
+
+        result.forEach(System.out::println);
+        Assertions.assertThat(result).isNotNull();
+    }
+
+    //결과를 담을 DTO 생성자에 @QueryProjection 사용
+    // DTO도 QType이 생성되어야 한다
+    @Test
+    public void usingQueryProjection() {
+        List<MemberDto> result = queryFactory
+                .select(new QMemberDto(QMember.member.username, QMember.member.age))
+                .from(QMember.member)
+                .fetch();
+
+        result.forEach(System.out::println);
+        Assertions.assertThat(result).isNotNull();
     }
 }
