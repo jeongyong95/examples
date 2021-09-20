@@ -7,9 +7,11 @@ import com.joojeongyong.simplequerydsl.entity.Member;
 import com.joojeongyong.simplequerydsl.entity.QMember;
 import com.joojeongyong.simplequerydsl.entity.QTeam;
 import com.joojeongyong.simplequerydsl.entity.Team;
+import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.QueryResults;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.assertj.core.api.Assertions;
@@ -23,6 +25,7 @@ import javax.persistence.EntityManagerFactory;
 import javax.persistence.PersistenceContext;
 import javax.persistence.PersistenceUnit;
 import java.util.List;
+import java.util.Objects;
 
 @Transactional
 @SpringBootTest
@@ -441,5 +444,55 @@ public class QuerydslBasicTest {
 
         result.forEach(System.out::println);
         Assertions.assertThat(result).isNotNull();
+    }
+
+    // BooleanBuilder를 이용한 다중 조건 검색
+    @Test
+    public void dynamicQueryBooleanBuilder() {
+        String username = "member01";
+        Integer age = 10;
+
+        List<Member> result = searchMemberUsingBooleanBuilder(username, age);
+        Assertions.assertThat(result.size()).isEqualTo(1);
+    }
+
+    private List<Member> searchMemberUsingBooleanBuilder(String username, Integer age) {
+        BooleanBuilder booleanBuilder = new BooleanBuilder();
+
+        if (Objects.nonNull(username)) {
+            booleanBuilder.and(QMember.member.username.eq(username));
+        }
+
+        if (Objects.nonNull(age)) {
+            booleanBuilder.and(QMember.member.age.eq(age));
+        }
+
+        return queryFactory.selectFrom(QMember.member)
+                .where(booleanBuilder)
+                .fetch();
+    }
+
+    // BooleanExpression을 반환하는 method를 이용한 다중 조건 검색
+    @Test
+    public void dynamicQueryWithWhereParameter() {
+        String username = "member01";
+        Integer age = 10;
+
+        List<Member> result = searchMemberUsingWhereParam(username, age);
+    }
+
+    private List<Member> searchMemberUsingWhereParam(String username, Integer age) {
+        return queryFactory.selectFrom(QMember.member)
+                .where(this.usernameEq(username), this.ageEq(age))
+                .fetch();
+
+    }
+
+    private BooleanExpression usernameEq(String username) {
+        return Objects.nonNull(username) ? QMember.member.username.eq(username) : null;
+    }
+
+    private BooleanExpression ageEq(Integer age) {
+        return Objects.nonNull(age) ? QMember.member.age.eq(age) : null;
     }
 }
